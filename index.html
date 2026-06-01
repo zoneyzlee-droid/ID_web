@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>室內設計學程｜新聞發布系統</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1410;
+    --paper: #f7f3ee;
+    --cream: #ede8e0;
+    --accent: #8b4513;
+    --accent-light: #c4712a;
+    --muted: #7a6f65;
+    --border: #d4cdc4;
+    --success: #3a6b4a;
+    --error: #8b2020;
+    --card: #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 3px solid var(--accent);
+  }
+
+  header .logo-mark {
+    width: 44px;
+    height: 44px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  header p {
+    font-size: 12px;
+    opacity: 0.6;
+    margin-top: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Layout */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* Step indicator */
+  .steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 40px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    padding: 16px 24px;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    opacity: 0.4;
+    transition: opacity 0.3s;
+  }
+
+  .step.active { opacity: 1; }
+  .step.done { opacity: 0.7; }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    background: var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+
+  .step.active .step-num {
+    background: var(--accent);
+    color: white;
+  }
+
+  .step.done .step-num {
+    background: var(--success);
+    color: white;
+  }
+
+  .step-label {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+  }
+
+  .step-divider {
+    width: 32px;
+    height: 1px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+
+  .card-title {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--ink);
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title .icon {
+    width: 24px;
+    height: 24px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+  }
+
+  /* Form elements */
+  .form-row {
+    margin-bottom: 20px;
+  }
+
+  .form-row label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+
+  .form-row input[type="text"],
+  .form-row textarea,
+  .form-row select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  .form-row input:focus,
+  .form-row textarea:focus,
+  .form-row select:focus {
+    border-color: var(--accent);
+  }
+
+  .form-row textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  /* Radio/Check groups */
+  .radio-group, .check-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .radio-group label, .check-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink);
+    transition: all 0.15s;
+    margin: 0;
+  }
+
+  .radio-group input, .check-group input {
+    display: none;
+  }
+
+  .radio-group label:has(input:checked),
+  .check-group label:has(input:checked) {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .radio-group label:hover,
+  .check-group label:hover {
+    border-color: var(--accent);
+  }
+
+  /* Image upload */
+  .upload-area {
+    border: 2px dashed var(--border);
+    background: var(--paper);
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .upload-area:hover {
+    border-color: var(--accent);
+    background: var(--cream);
+  }
+
+  .upload-area input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .upload-area .upload-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+
+  .upload-area p {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .upload-area p strong {
+    color: var(--accent);
+  }
+
+  .image-previews {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .image-preview-item {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .image-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .image-preview-item button {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--error);
+    color: white;
+    border: none;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--ink);
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: white;
+  }
+
+  .btn-success:hover {
+    background: #2d5239;
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Preview section */
+  #preview-section { display: none; }
+
+  .preview-article {
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .preview-header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--cream);
+  }
+
+  .preview-header .preview-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 3px 10px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  #preview-title {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--ink);
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    border-bottom: 2px dashed transparent;
+    transition: border-color 0.2s;
+    padding: 4px 0;
+  }
+
+  #preview-title:focus {
+    border-bottom-color: var(--accent);
+  }
+
+  .preview-body {
+    padding: 32px;
+  }
+
+  .preview-images {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .preview-images img {
+    width: 100%;
+    aspect-ratio: 4/3;
+    object-fit: cover;
+    border: 1px solid var(--border);
+  }
+
+  #preview-content {
+    font-size: 15px;
+    line-height: 1.9;
+    color: var(--ink);
+    width: 100%;
+    min-height: 200px;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: 'Noto Sans TC', sans-serif;
+    border: 1px dashed transparent;
+    padding: 8px;
+    transition: border-color 0.2s;
+  }
+
+  #preview-content:focus {
+    border-color: var(--accent);
+    background: var(--paper);
+  }
+
+  .edit-hint {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Loading overlay */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 20, 16, 0.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .loading-overlay.active {
+    display: flex;
+  }
+
+  .loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(247, 243, 238, 0.2);
+    border-top-color: var(--accent-light);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    color: var(--paper);
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+
+  .loading-sub {
+    color: rgba(247, 243, 238, 0.5);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Notification */
+  .notification {
+    display: none;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    border-left: 3px solid;
+    letter-spacing: 0.03em;
+  }
+
+  .notification.success {
+    display: flex;
+    background: #edf7f0;
+    border-color: var(--success);
+    color: var(--success);
+  }
+
+  .notification.error {
+    display: flex;
+    background: #fdf0f0;
+    border-color: var(--error);
+    color: var(--error);
+  }
+
+  .notification.info {
+    display: flex;
+    background: #f0f4fd;
+    border-color: #4a6fa5;
+    color: #4a6fa5;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .status-badge.waiting {
+    background: #fff8e6;
+    color: #9a6e00;
+    border: 1px solid #e8d48a;
+  }
+
+  .status-badge.ready {
+    background: #edf7f0;
+    color: var(--success);
+    border: 1px solid #a8d4b4;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Issue link */
+  .issue-link-box {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+
+  .issue-link-box a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .issue-link-box a:hover {
+    text-decoration: underline;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    header { padding: 16px 20px; }
+    .container { padding: 24px 16px; }
+    .card { padding: 20px; }
+    .steps { padding: 12px 16px; }
+    .step-label { display: none; }
+    .btn { padding: 12px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">ID</div>
+  <div>
+    <h1>室內設計學程｜新聞自動發布系統</h1>
+    <p>INTERIOR DESIGN PROGRAM · NEWS PUBLISHER</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step active" id="step1">
+      <div class="step-num">1</div>
+      <span class="step-label">填寫資料</span>
+    </div>
+    <div class="step-divider"></div>
+    <div class="step" id="step2">
+      <div class="step-num">2</div>
+      <span class="step-label">等待預覽</span>
+    </div>
+    <div class="step-divider"></div>
+    <div class="step" id="step3">
+      <div class="step-num">3</div>
+      <span class="step-label">確認預覽</span>
+    </div>
+    <div class="step-divider"></div>
+    <div class="step" id="step4">
+      <div class="step-num">4</div>
+      <span class="step-label">發布完成</span>
+    </div>
+  </div>
+
+  <!-- Notification area -->
+  <div class="notification" id="notification"></div>
+
+  <!-- FORM SECTION -->
+  <div id="form-section">
+
+    <!-- Images -->
+    <div class="card">
+      <div class="card-title">
+        <div class="icon">📷</div>
+        上傳照片
+      </div>
+      <div class="upload-area" id="upload-area">
+        <input type="file" id="image-input" multiple accept="image/*">
+        <div class="upload-icon">🖼</div>
+        <p><strong>點擊或拖曳</strong>上傳照片</p>
+        <p>支援 JPG、PNG、WEBP，可多選</p>
+      </div>
+      <div class="image-previews" id="image-previews"></div>
+    </div>
+
+    <!-- Content info -->
+    <div class="card">
+      <div class="card-title">
+        <div class="icon">✏</div>
+        新聞內容
+      </div>
+
+      <div class="form-row">
+        <label>關鍵字／內容描述 *</label>
+        <textarea id="keywords" placeholder="請描述新聞的主要內容，例如：&#10;活動名稱、時間地點、參與師生人數、主要成果、特色亮點...&#10;&#10;越詳細，生成的新聞稿越準確！"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label>發布對象</label>
+        <div class="radio-group" id="audience-group">
+          <label><input type="radio" name="audience" value="一般大眾" checked> 一般大眾</label>
+          <label><input type="radio" name="audience" value="在校學生"> 在校學生</label>
+          <label><input type="radio" name="audience" value="家長"> 家長</label>
+          <label><input type="radio" name="audience" value="招生對象"> 招生對象</label>
+          <label><input type="radio" name="audience" value="業界人士"> 業界人士</label>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>語氣風格</label>
+        <div class="radio-group" id="tone-group">
+          <label><input type="radio" name="tone" value="正式學術" checked> 🎓 正式／學術</label>
+          <label><input type="radio" name="tone" value="親切溫暖"> 😊 親切／溫暖</label>
+          <label><input type="radio" name="tone" value="活潑年輕"> 🔥 活潑／年輕</label>
+          <label><input type="radio" name="tone" value="新聞報導式"> 📰 新聞報導式</label>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>語言需求</label>
+        <div class="radio-group" id="lang-group">
+          <label><input type="radio" name="language" value="繁體中文" checked> 🇹🇼 繁體中文</label>
+          <label><input type="radio" name="language" value="英文"> 🇺🇸 英文</label>
+          <label><input type="radio" name="language" value="中英雙語"> 🌐 中英雙語</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="submitForPreview()">
+        📤 送出預覽請求
+      </button>
+    </div>
+
+    <div class="issue-link-box" id="issue-link-box" style="display:none">
+      <strong>已送出！</strong> 你可以在此追蹤進度：<br>
+      <a href="#" id="issue-link" target="_blank">→ 查看 GitHub Issue</a>
+      <br><br>
+      <span class="status-badge waiting"><span class="dot"></span> AI 生成中，約 1~2 分鐘後完成</span>
+      <br><br>
+      <small>完成後請重新整理此頁，或直接在 GitHub Issue 中查看生成結果，再填入下方預覽區確認。</small>
+    </div>
+
+  </div>
+
+  <!-- PREVIEW SECTION -->
+  <div id="preview-section">
+
+    <div class="card">
+      <div class="card-title">
+        <div class="icon">👁</div>
+        新聞預覽
+        <span class="status-badge ready" style="margin-left:auto"><span class="dot"></span> 可直接編輯</span>
+      </div>
+
+      <div class="preview-article">
+        <div class="preview-header">
+          <div class="preview-badge">室內設計學程 · 最新消息</div>
+          <input type="text" id="preview-title" placeholder="新聞標題">
+          <p class="edit-hint">✎ 點擊可直接編輯標題</p>
+        </div>
+        <div class="preview-body">
+          <div class="preview-images" id="preview-images"></div>
+          <textarea id="preview-content" placeholder="新聞內文"></textarea>
+          <p class="edit-hint">✎ 點擊可直接編輯內文</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="publishNews()">
+        🚀 確認發布到 WordPress
+      </button>
+      <button class="btn btn-secondary" onclick="regenerate()">
+        🔄 重新生成
+      </button>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">處理中...</div>
+  <div class="loading-sub" id="loading-sub"></div>
+</div>
+
+<script>
+  // ============================
+  // CONFIG — GitHub repository info
+  // ============================
+  const GITHUB_OWNER = 'zoneyzlee-droid';
+  const GITHUB_REPO = 'ID_web';
+  const GITHUB_TOKEN_KEY = 'gh_token'; // stored in sessionStorage
+
+  // ============================
+  // State
+  // ============================
+  let uploadedImages = []; // { file, dataUrl, base64, name }
+  let currentIssueNumber = null;
+
+  // ============================
+  // GitHub Token (session only)
+  // ============================
+  function getGitHubToken() {
+    let token = sessionStorage.getItem(GITHUB_TOKEN_KEY);
+    if (!token) {
+      token = prompt('請輸入 GitHub Personal Access Token（僅本次使用，不會儲存）：\n\n需要 repo 權限');
+      if (token) sessionStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
+    }
+    return token;
+  }
+
+  // ============================
+  // Image upload handling
+  // ============================
+  document.getElementById('image-input').addEventListener('change', handleImageSelect);
+
+  // Drag & drop
+  const uploadArea = document.getElementById('upload-area');
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--accent)'; });
+  uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = 'var(--border)'; });
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.style.borderColor = 'var(--border)';
+    handleFiles(e.dataTransfer.files);
+  });
+
+  function handleImageSelect(e) {
+    handleFiles(e.target.files);
+  }
+
+  function handleFiles(files) {
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target.result;
+        const base64 = dataUrl.split(',')[1];
+        uploadedImages.push({ file, dataUrl, base64, name: file.name, type: file.type });
+        renderImagePreviews();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderImagePreviews() {
+    const container = document.getElementById('image-previews');
+    container.innerHTML = '';
+    uploadedImages.forEach((img, i) => {
+      const div = document.createElement('div');
+      div.className = 'image-preview-item';
+      div.innerHTML = `
+        <img src="${img.dataUrl}" alt="${img.name}">
+        <button onclick="removeImage(${i})">✕</button>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  function removeImage(index) {
+    uploadedImages.splice(index, 1);
+    renderImagePreviews();
+  }
+
+  // ============================
+  // Submit for preview
+  // ============================
+  async function submitForPreview() {
+    const keywords = document.getElementById('keywords').value.trim();
+    if (!keywords) {
+      showNotification('請填寫關鍵字／內容描述！', 'error');
+      return;
+    }
+
+    const token = getGitHubToken();
+    if (!token) return;
+
+    const audience = document.querySelector('input[name="audience"]:checked').value;
+    const tone = document.querySelector('input[name="tone"]:checked').value;
+    const language = document.querySelector('input[name="language"]:checked').value;
+
+    // Build issue body with metadata
+    const imagesInfo = uploadedImages.length > 0
+      ? `\n\n**附件圖片：** ${uploadedImages.map(i => i.name).join(', ')} (${uploadedImages.length} 張)`
+      : '\n\n**附件圖片：** 無';
+
+    // Encode images as base64 JSON in issue body (hidden block)
+    const imageData = uploadedImages.map(i => ({ name: i.name, type: i.type, base64: i.base64 }));
+
+    const issueBody = `## 新聞發布請求
+
+**關鍵字／內容：**
+${keywords}
+
+**發布對象：** ${audience}
+**語氣風格：** ${tone}
+**語言需求：** ${language}
+${imagesInfo}
+
+---
+
+<!-- PUBLISH_DATA
+${JSON.stringify({ keywords, audience, tone, language, images: imageData })}
+END_PUBLISH_DATA -->
+
+> 此 Issue 由新聞發布系統自動建立，請勿手動修改。`;
+
+    showLoading('送出請求中...', '建立 GitHub Issue');
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify({
+          title: `[新聞發布] ${new Date().toLocaleDateString('zh-TW')} - ${keywords.substring(0, 40)}`,
+          body: issueBody,
+          labels: ['news-publish']
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || '建立 Issue 失敗');
+      }
+
+      const issue = await res.json();
+      currentIssueNumber = issue.number;
+
+      hideLoading();
+      setStep(2);
+
+      // Show issue link
+      document.getElementById('issue-link-box').style.display = 'block';
+      document.getElementById('issue-link').href = issue.html_url;
+      document.getElementById('issue-link').textContent = `→ 查看 Issue #${issue.number}`;
+
+      showNotification(`✅ 請求已送出！GitHub Actions 正在生成新聞稿，約 1~2 分鐘後完成。<br>完成後請點「載入預覽」按鈕。`, 'success');
+
+      // Add load preview button
+      const btnRow = document.querySelector('.btn-row');
+      btnRow.innerHTML = `
+        <button class="btn btn-primary" onclick="loadPreview(${issue.number})">
+          🔄 載入預覽結果
+        </button>
+        <button class="btn btn-secondary" onclick="resetForm()">
+          ← 重新填寫
+        </button>
+      `;
+
+    } catch (err) {
+      hideLoading();
+      showNotification(`❌ 錯誤：${err.message}`, 'error');
+    }
+  }
+
+  // ============================
+  // Load preview from issue comments
+  // ============================
+  async function loadPreview(issueNumber) {
+    const token = getGitHubToken();
+    if (!token) return;
+
+    showLoading('載入預覽中...', '從 GitHub 取得生成結果');
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${issueNumber}/comments`, {
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+
+      const comments = await res.json();
+
+      // Find comment with generated news
+      const newsComment = comments.find(c => c.body.includes('<!-- GENERATED_NEWS'));
+
+      if (!newsComment) {
+        hideLoading();
+        showNotification('⏳ AI 尚未生成完成，請稍候 1~2 分鐘後再試。', 'info');
+        return;
+      }
+
+      // Parse generated news from comment
+      const match = newsComment.body.match(/<!-- GENERATED_NEWS\n([\s\S]*?)\nEND_GENERATED_NEWS -->/);
+      if (!match) {
+        hideLoading();
+        showNotification('❌ 無法解析生成結果，請查看 GitHub Issue。', 'error');
+        return;
+      }
+
+      const newsData = JSON.parse(match[1]);
+
+      hideLoading();
+      showPreview(newsData);
+
+    } catch (err) {
+      hideLoading();
+      showNotification(`❌ 錯誤：${err.message}`, 'error');
+    }
+  }
+
+  // ============================
+  // Show preview
+  // ============================
+  function showPreview(newsData) {
+    document.getElementById('preview-title').value = newsData.title || '';
+    document.getElementById('preview-content').value = newsData.content || '';
+
+    // Show images
+    const previewImages = document.getElementById('preview-images');
+    previewImages.innerHTML = '';
+    uploadedImages.forEach(img => {
+      const el = document.createElement('img');
+      el.src = img.dataUrl;
+      el.alt = img.name;
+      previewImages.appendChild(el);
+    });
+
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setStep(3);
+    showNotification('✅ 預覽已載入！你可以直接點擊標題或內文進行編輯。', 'success');
+  }
+
+  // ============================
+  // Publish to WordPress via GitHub Actions
+  // ============================
+  async function publishNews() {
+    const title = document.getElementById('preview-title').value.trim();
+    const content = document.getElementById('preview-content').value.trim();
+
+    if (!title || !content) {
+      showNotification('請確認標題和內文都已填寫！', 'error');
+      return;
+    }
+
+    if (!confirm(`確認要發布這篇新聞到 WordPress 嗎？\n\n標題：${title}`)) return;
+
+    const token = getGitHubToken();
+    if (!token) return;
+
+    // Encode images
+    const imageData = uploadedImages.map(i => ({ name: i.name, type: i.type, base64: i.base64 }));
+
+    const publishBody = `## ✅ 確認發布
+
+**標題：** ${title}
+
+**內文：**
+${content}
+
+---
+
+<!-- PUBLISH_CONFIRM
+${JSON.stringify({ title, content, images: imageData })}
+END_PUBLISH_CONFIRM -->`;
+
+    showLoading('送出發布請求...', '觸發 GitHub Actions');
+
+    try {
+      // Add confirm comment to existing issue or create new publish issue
+      const endpoint = currentIssueNumber
+        ? `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${currentIssueNumber}/comments`
+        : `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
+
+      const isComment = !!currentIssueNumber;
+
+      const body = isComment
+        ? { body: publishBody }
+        : { title: `[發布確認] ${title.substring(0, 50)}`, body: publishBody, labels: ['news-publish-confirm'] };
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) throw new Error('送出失敗');
+
+      hideLoading();
+      setStep(4);
+      showNotification('🚀 發布請求已送出！GitHub Actions 正在上傳圖片並發布到 WordPress，約 1~2 分鐘後完成。', 'success');
+
+      document.querySelector('#preview-section .btn-row').innerHTML = `
+        <div style="padding:16px;background:var(--cream);border:1px solid var(--border);font-size:13px;color:var(--success)">
+          ✅ 發布請求已送出，請等待 1~2 分鐘後至 WordPress 確認。
+        </div>
+        <button class="btn btn-secondary" onclick="resetForm()">← 發布新一則新聞</button>
+      `;
+
+    } catch (err) {
+      hideLoading();
+      showNotification(`❌ 錯誤：${err.message}`, 'error');
+    }
+  }
+
+  // ============================
+  // Regenerate
+  // ============================
+  function regenerate() {
+    document.getElementById('preview-section').style.display = 'none';
+    document.getElementById('form-section').scrollIntoView({ behavior: 'smooth' });
+    setStep(1);
+    showNotification('請修改關鍵字或設定後重新送出。', 'info');
+  }
+
+  // ============================
+  // Reset form
+  // ============================
+  function resetForm() {
+    uploadedImages = [];
+    currentIssueNumber = null;
+    document.getElementById('keywords').value = '';
+    document.getElementById('image-previews').innerHTML = '';
+    document.getElementById('image-input').value = '';
+    document.getElementById('issue-link-box').style.display = 'none';
+    document.getElementById('preview-section').style.display = 'none';
+    document.getElementById('notification').style.display = 'none';
+    document.getElementById('notification').className = 'notification';
+
+    const btnRow = document.querySelector('#form-section .btn-row');
+    btnRow.innerHTML = `<button class="btn btn-primary" onclick="submitForPreview()">📤 送出預覽請求</button>`;
+
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ============================
+  // Helpers
+  // ============================
+  function setStep(n) {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById(`step${i}`);
+      el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+    }
+  }
+
+  function showNotification(msg, type) {
+    const el = document.getElementById('notification');
+    el.innerHTML = msg;
+    el.className = `notification ${type}`;
+    el.style.display = 'flex';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showLoading(text, sub) {
+    document.getElementById('loading-text').textContent = text;
+    document.getElementById('loading-sub').textContent = sub || '';
+    document.getElementById('loading-overlay').classList.add('active');
+  }
+
+  function hideLoading() {
+    document.getElementById('loading-overlay').classList.remove('active');
+  }
+</script>
+</body>
+</html>
