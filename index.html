@@ -821,12 +821,31 @@
   function handleFiles(files) {
     Array.from(files).forEach(file => {
       if (!file.type.startsWith('image/')) return;
+      compressImage(file).then(({ dataUrl, base64, type }) => {
+        uploadedImages.push({ file, dataUrl, base64, name: file.name, type });
+        renderImagePreviews();
+      });
+    });
+  }
+
+  // Compress image to max 800px wide, quality 0.75, JPEG
+  function compressImage(file) {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = e => {
-        const dataUrl = e.target.result;
-        const base64 = dataUrl.split(',')[1];
-        uploadedImages.push({ file, dataUrl, base64, name: file.name, type: file.type });
-        renderImagePreviews();
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          const base64 = dataUrl.split(',')[1];
+          resolve({ dataUrl, base64, type: 'image/jpeg' });
+        };
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     });
