@@ -31,7 +31,6 @@ jobs:
           repo = os.environ.get('REPO', '')
           issue_number = os.environ.get('ISSUE_NUMBER', '')
 
-          # Extract publish confirm data
           match = re.search(r'<!-- PUBLISH_CONFIRM\n(.*?)\nEND_PUBLISH_CONFIRM -->', comment_body, re.DOTALL)
           if not match:
               print("ERROR: Could not find publish confirm data")
@@ -43,15 +42,12 @@ jobs:
 
           print("Publishing: " + title)
 
-          # Auth header
           credentials = wp_username + ":" + wp_app_password
           encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
           auth_header = "Basic " + encoded
 
-          # Format content
           full_content = content.replace('\n', '<br>\n')
 
-          # Publish to WordPress custom post type 'news'
           post_data = {
               'title': title,
               'content': full_content,
@@ -74,8 +70,13 @@ jobs:
 
           try:
               with urllib.request.urlopen(post_req) as resp:
-                  post_result = json.loads(resp.read().decode('utf-8'))
-                  published_url = post_result.get('link', '')
+                  resp_body = resp.read().decode('utf-8')
+                  print("Raw response: " + resp_body[:200])
+                  post_result = json.loads(resp_body)
+                  # Handle both dict and list responses
+                  if isinstance(post_result, list):
+                      post_result = post_result[0] if post_result else {}
+                  published_url = str(post_result.get('link', ''))
                   published_id = str(post_result.get('id', ''))
                   print("Published! Post ID: " + published_id)
                   print("URL: " + published_url)
@@ -97,8 +98,11 @@ jobs:
               )
               try:
                   with urllib.request.urlopen(post_req2) as resp2:
-                      post_result2 = json.loads(resp2.read().decode('utf-8'))
-                      published_url = post_result2.get('link', '')
+                      resp_body2 = resp2.read().decode('utf-8')
+                      post_result2 = json.loads(resp_body2)
+                      if isinstance(post_result2, list):
+                          post_result2 = post_result2[0] if post_result2 else {}
+                      published_url = str(post_result2.get('link', ''))
                       published_id = str(post_result2.get('id', ''))
                       print("Fallback published! ID: " + published_id)
               except urllib.error.HTTPError as e2:
