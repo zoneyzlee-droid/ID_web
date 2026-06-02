@@ -653,21 +653,6 @@
   <!-- FORM SECTION -->
   <div id="form-section">
 
-    <!-- Images -->
-    <div class="card">
-      <div class="card-title">
-        <div class="icon">📷</div>
-        上傳照片
-      </div>
-      <div class="upload-area" id="upload-area">
-        <input type="file" id="image-input" multiple accept="image/*">
-        <div class="upload-icon">🖼</div>
-        <p><strong>點擊或拖曳</strong>上傳照片</p>
-        <p>支援 JPG、PNG、WEBP，可多選</p>
-      </div>
-      <div class="image-previews" id="image-previews"></div>
-    </div>
-
     <!-- Content info -->
     <div class="card">
       <div class="card-title">
@@ -784,7 +769,6 @@
   // ============================
   // State
   // ============================
-  let uploadedImages = []; // { file, dataUrl, base64, name }
   let currentIssueNumber = null;
 
   // ============================
@@ -797,88 +781,6 @@
       if (token) sessionStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
     }
     return token;
-  }
-
-  // ============================
-  // Image upload handling
-  // ============================
-  document.getElementById('image-input').addEventListener('change', handleImageSelect);
-
-  // Drag & drop
-  const uploadArea = document.getElementById('upload-area');
-  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--accent)'; });
-  uploadArea.addEventListener('dragleave', () => { uploadArea.style.borderColor = 'var(--border)'; });
-  uploadArea.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadArea.style.borderColor = 'var(--border)';
-    handleFiles(e.dataTransfer.files);
-  });
-
-  function handleImageSelect(e) {
-    handleFiles(e.target.files);
-  }
-
-  function handleFiles(files) {
-    const remaining = 4 - uploadedImages.length;
-    if (remaining <= 0) {
-      showNotification('最多上傳 4 張照片，請先移除部分照片。', 'error');
-      return;
-    }
-    let added = 0;
-    Array.from(files).forEach(file => {
-      if (!file.type.startsWith('image/')) return;
-      if (added >= remaining) return;
-      added++;
-      compressImage(file).then(({ dataUrl, base64, type }) => {
-        uploadedImages.push({ file, dataUrl, base64, name: file.name, type });
-        renderImagePreviews();
-      });
-    });
-    if (Array.from(files).filter(f => f.type.startsWith('image/')).length > remaining) {
-      showNotification(`最多上傳 4 張照片，已只取前 ${remaining} 張。`, 'info');
-    }
-  }
-
-  // Compress image to max 800px wide, quality 0.75, JPEG
-  function compressImage(file) {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-          const MAX = 400;
-          let w = img.width, h = img.height;
-          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          const base64 = dataUrl.split(',')[1];
-          resolve({ dataUrl, base64, type: 'image/jpeg' });
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function renderImagePreviews() {
-    const container = document.getElementById('image-previews');
-    container.innerHTML = '';
-    uploadedImages.forEach((img, i) => {
-      const div = document.createElement('div');
-      div.className = 'image-preview-item';
-      div.innerHTML = `
-        <img src="${img.dataUrl}" alt="${img.name}">
-        <button onclick="removeImage(${i})">✕</button>
-      `;
-      container.appendChild(div);
-    });
-  }
-
-  function removeImage(index) {
-    uploadedImages.splice(index, 1);
-    renderImagePreviews();
   }
 
   // ============================
@@ -898,12 +800,6 @@
     const tone = document.querySelector('input[name="tone"]:checked').value;
     const language = document.querySelector('input[name="language"]:checked').value;
 
-    // Images stay in browser memory only — NOT sent to GitHub
-    const imagesInfo = uploadedImages.length > 0
-      ? `**附件圖片：** ${uploadedImages.map(i => i.name).join(', ')} (${uploadedImages.length} 張)`
-      : '**附件圖片：** 無';
-
-    // Only text metadata goes into Issue (no base64 images)
     const issueBody = `## 新聞發布請求
 
 **關鍵字／內容：**
@@ -912,7 +808,6 @@ ${keywords}
 **發布對象：** ${audience}
 **語氣風格：** ${tone}
 **語言需求：** ${language}
-${imagesInfo}
 
 ---
 
@@ -1028,16 +923,6 @@ END_PUBLISH_DATA -->
     document.getElementById('preview-title').value = newsData.title || '';
     document.getElementById('preview-content').value = newsData.content || '';
 
-    // Show images
-    const previewImages = document.getElementById('preview-images');
-    previewImages.innerHTML = '';
-    uploadedImages.forEach(img => {
-      const el = document.createElement('img');
-      el.src = img.dataUrl;
-      el.alt = img.name;
-      previewImages.appendChild(el);
-    });
-
     document.getElementById('preview-section').style.display = 'block';
     document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
     setStep(3);
@@ -1062,15 +947,8 @@ END_PUBLISH_DATA -->
     const token = getGitHubToken();
     if (!token) return;
 
-    // 把圖片 base64 打包，連同標題/內文一起送到 GitHub Actions
-    // 由伺服器端上傳 WordPress，避免瀏覽器 CORS 問題
-    const images = uploadedImages.map(img => ({
-      name: img.name,
-      data: img.base64,
-      type: img.type || 'image/jpeg'
-    }));
-
-    const confirmData = { title, content, images };
+    // 只傳文字，圖片請在 WordPress 後台手動上傳
+    const confirmData = { title, content };
 
     const commentBody = `<!-- PUBLISH_CONFIRM\n${JSON.stringify(confirmData)}\nEND_PUBLISH_CONFIRM -->`;
 
@@ -1127,11 +1005,8 @@ END_PUBLISH_DATA -->
   // Reset form
   // ============================
   function resetForm() {
-    uploadedImages = [];
     currentIssueNumber = null;
     document.getElementById('keywords').value = '';
-    document.getElementById('image-previews').innerHTML = '';
-    document.getElementById('image-input').value = '';
     document.getElementById('issue-link-box').style.display = 'none';
     document.getElementById('preview-section').style.display = 'none';
     document.getElementById('notification').style.display = 'none';
