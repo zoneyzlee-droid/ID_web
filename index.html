@@ -1037,21 +1037,6 @@ END_PUBLISH_DATA -->
   // Publish directly to WordPress from browser
   // Images uploaded directly; text via GitHub Actions
   // ============================
-  // ============================
-  // Get WordPress credentials (session only)
-  // ============================
-  function getWpCredentials() {
-    let creds = sessionStorage.getItem('wp_creds');
-    if (!creds) {
-      const username = 'fcuid';
-      const appPassword = prompt('請輸入 WordPress Application Password\n（格式：xxxx xxxx xxxx xxxx xxxx xxxx）\n僅本次使用，不會儲存');
-      if (!appPassword) return null;
-      creds = btoa(username + ':' + appPassword.trim());
-      sessionStorage.setItem('wp_creds', creds);
-    }
-    return creds;
-  }
-
   async function publishNews() {
     const title = document.getElementById('preview-title').value.trim();
     const content = document.getElementById('preview-content').value.trim();
@@ -1066,80 +1051,47 @@ END_PUBLISH_DATA -->
     const token = getGitHubToken();
     if (!token) return;
 
-    const wpCreds = getWpCredentials();
-    if (!wpCreds) return;
+    // 把圖片 base64 打包，連同標題/內文一起送到 GitHub Actions
+    // 由伺服器端上傳 WordPress，避免瀏覽器 CORS 問題
+    const images = uploadedImages.map(img => ({
+      name: img.name,
+      data: img.base64,
+      type: img.type || 'image/jpeg'
+    }));
 
-    const WP_URL = 'https://id.fcu.edu.tw';
+    const confirmData = { title, content, images };
 
-    showLoading('上傳圖片中...', `共 ${uploadedImages.length} 張`);
+    const commentBody = `<!-- PUBLISH_CONFIRM\n${JSON.stringify(confirmData)}\nEND_PUBLISH_CONFIRM -->`;
 
-    // Upload images directly to WordPress
-    const mediaIds = [];
-    for (let i = 0; i < uploadedImages.length; i++) {
-      const img = uploadedImages[i];
-      try {
-        showLoading(`上傳圖片 ${i+1}/${uploadedImages.length}...`, img.name);
-        const blob = await fetch(img.dataUrl).then(r => r.blob());
-        const formData = new FormData();
-        formData.append('file', blob, img.name);
+    showLoading('送出發布請求中...', '圖片打包中，請稍候');
 
-        const mediaRes = await fetch(`${WP_URL}/wp-json/wp/v2/media`, {
-          method: 'POST',
-          headers: { 'Authorization': `Basic ${wpCreds}` },
-          body: formData
-        });
-
-        if (mediaRes.ok) {
-          const mediaData = await mediaRes.json();
-          mediaIds.push({ id: mediaData.id, url: mediaData.source_url });
-          console.log('Uploaded image:', mediaData.source_url);
-        } else {
-          console.error('Image upload failed:', await mediaRes.text());
-        }
-      } catch (e) {
-        console.error('Image upload error:', e);
-      }
-    }
-
-    // Build content with images
-    let imgHtml = '';
-    if (mediaIds.length > 0) {
-      imgHtml = '<div class="news-images" style="margin-bottom:24px;">';
-      mediaIds.forEach(m => {
-        imgHtml += `<figure style="margin-bottom:12px;"><img src="${m.url}" style="max-width:100%;height:auto;" /></figure>`;
-      });
-      imgHtml += '</div>';
-    }
-    const fullContent = imgHtml + content.replace(/\n/g, '<br>\n');
-
-    showLoading('發布新聞中...', '');
-
-    // Publish to WordPress directly
     try {
-      const postRes = await fetch(`${WP_URL}/wp-json/wp/v2/news`, {
+      const issueNumber = currentIssueNumber;
+      if (!issueNumber) throw new Error('找不到 Issue 編號，請重新整理頁面後再試');
+
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${issueNumber}/comments`, {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${wpCreds}`,
-          'Content-Type': 'application/json'
+          'Authorization': `token ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
         },
-        body: JSON.stringify({ title, content: fullContent, status: 'publish' })
+        body: JSON.stringify({ body: commentBody })
       });
 
-      if (!postRes.ok) {
-        const err = await postRes.text();
-        throw new Error('WordPress 發布失敗：' + err);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || '送出失敗');
       }
-
-      const postData = await postRes.json();
-      const postUrl = postData.link || '';
 
       hideLoading();
       setStep(4);
-      showNotification(`✅ 發布成功！<a href="${postUrl}" target="_blank">點此查看文章</a>`, 'success');
+      showNotification(`✅ 發布請求已送出！GitHub Actions 正在上傳圖片並發布到 WordPress，約 1~2 分鐘後完成。`, 'success');
 
       document.querySelector('#preview-section .btn-row').innerHTML = `
         <div style="padding:16px;background:var(--cream);border:1px solid var(--border);font-size:13px;color:var(--success)">
-          ✅ 已成功發布到 WordPress！${postUrl ? `<br><a href="${postUrl}" target="_blank" style="color:var(--accent)">→ 查看文章</a>` : ''}
+          ✅ 發布請求已送出！請稍候約 1~2 分鐘，WordPress 即會更新。<br>
+          <a href="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${issueNumber}" target="_blank" style="color:var(--accent)">→ 查看發布進度（GitHub Issue）</a>
         </div>
         <button class="btn btn-secondary" onclick="resetForm()">← 發布新一則新聞</button>
       `;
