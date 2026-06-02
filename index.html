@@ -980,12 +980,13 @@ END_PUBLISH_DATA -->
 
       hideLoading();
       setStep(4);
-      showNotification(`✅ 發布請求已送出！GitHub Actions 正在上傳圖片並發布到 WordPress，約 1~2 分鐘後完成。`, 'success');
+      showNotification(`✅ 發布請求已送出！GitHub Actions 正在發布到 WordPress，約 1~2 分鐘後完成。`, 'success');
 
       document.querySelector('#preview-section .btn-row').innerHTML = `
-        <div style="padding:16px;background:var(--cream);border:1px solid var(--border);font-size:13px;color:var(--success)">
+        <div style="padding:16px;background:var(--cream);border:1px solid var(--border);font-size:13px;color:var(--success);line-height:2">
           ✅ 發布請求已送出！請稍候約 1~2 分鐘，WordPress 即會更新。<br>
-          <a href="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${issueNumber}" target="_blank" style="color:var(--accent)">→ 查看發布進度（GitHub Issue）</a>
+          <a href="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${issueNumber}" target="_blank" style="color:var(--accent)">→ 查看發布進度（GitHub Issue）</a><br>
+          <a href="https://id.fcu.edu.tw/wp-admin/edit.php?post_type=news" target="_blank" style="color:var(--accent)">→ 前往 WordPress 後台新增照片</a>
         </div>
         <button class="btn btn-secondary" onclick="resetForm()">← 發布新一則新聞</button>
       `;
