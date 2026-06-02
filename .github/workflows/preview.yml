@@ -27,7 +27,6 @@ jobs:
           gh_token = os.environ.get('GH_TOKEN', '')
           repo = os.environ.get('REPO', '')
 
-          # Extract JSON from issue body
           match = re.search(r'<!-- PUBLISH_DATA\n(.*?)\nEND_PUBLISH_DATA -->', issue_body, re.DOTALL)
           if not match:
               print("ERROR: Could not find publish data")
@@ -40,76 +39,52 @@ jobs:
           language = data.get('language', '繁體中文')
 
           tone_map = {
-              '正式學術': '使用正式、學術的語氣，措辭嚴謹，適合對外官方公告',
-              '親切溫暖': '使用親切、溫暖的語氣，貼近讀者，讓人感到友善',
-              '活潑年輕': '使用活潑、年輕的語氣，充滿活力，適合吸引學生族群',
-              '新聞報導式': '使用客觀的新聞報導語氣，第三人稱，事實導向'
+              '正式學術': '正式學術語氣',
+              '親切溫暖': '親切溫暖語氣',
+              '活潑年輕': '活潑年輕語氣',
+              '新聞報導式': '客觀新聞報導語氣'
           }
           lang_map = {
-              '繁體中文': '請以繁體中文撰寫',
-              '英文': 'Please write in English',
-              '中英雙語': '請同時提供繁體中文版本和英文版本，先中文後英文'
+              '繁體中文': '繁體中文',
+              '英文': 'English',
+              '中英雙語': '繁體中文與英文雙語'
           }
 
-          tone_instruction = tone_map.get(tone, tone_map['正式學術'])
-          lang_instruction = lang_map.get(language, lang_map['繁體中文'])
+          # Use two separate prompts to avoid JSON issues
+          title_prompt = "你是逢甲大學室內設計學程新聞助手。請根據以下關鍵字，產生一個新聞標題，不超過30個字，只輸出標題文字，不要有任何其他內容：\n關鍵字：" + keywords
 
-          prompt = "你是逢甲大學室內設計學士學位學程的新聞稿撰寫助手。\n"
-          prompt += "請根據以下資訊撰寫新聞稿。\n\n"
-          prompt += "關鍵字：" + keywords + "\n"
-          prompt += "對象：" + audience + "\n"
-          prompt += "語氣：" + tone_instruction + "\n"
-          prompt += "語言：" + lang_instruction + "\n\n"
-          prompt += "請回傳 JSON 格式如下，title 為標題不超過30字，content 為內文400到600字。\n"
-          prompt += "只能回傳 JSON，不能有其他文字、不能有 markdown 符號：\n"
-          prompt += "{\"title\": \"標題\", \"content\": \"內文\"}"
+          content_prompt = "你是逢甲大學室內設計學程新聞助手。請根據以下資訊撰寫新聞內文，400到600字，" + tone_map.get(tone, '正式學術語氣') + "，以" + lang_map.get(language, '繁體中文') + "撰寫，對象為" + audience + "。只輸出內文，不要標題，不要任何格式符號：\n關鍵字：" + keywords
 
-          payload = {
-              "contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {
-                  "temperature": 0.7,
-                  "maxOutputTokens": 2000,
-                  "responseMimeType": "application/json"
+          def call_gemini(prompt):
+              payload = {
+                  "contents": [{"parts": [{"text": prompt}]}],
+                  "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1500}
               }
-          }
-
-          api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + gemini_key
-
-          req = urllib.request.Request(
-              api_url,
-              data=json.dumps(payload).encode('utf-8'),
-              headers={'Content-Type': 'application/json'},
-              method='POST'
-          )
-
-          try:
+              api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + gemini_key
+              req = urllib.request.Request(
+                  api_url,
+                  data=json.dumps(payload).encode('utf-8'),
+                  headers={'Content-Type': 'application/json'},
+                  method='POST'
+              )
               with urllib.request.urlopen(req) as resp:
                   result = json.loads(resp.read().decode('utf-8'))
+              return result['candidates'][0]['content']['parts'][0]['text'].strip()
+
+          try:
+              title = call_gemini(title_prompt)
+              print("Title: " + title)
+              content = call_gemini(content_prompt)
+              print("Content length: " + str(len(content)))
           except urllib.error.HTTPError as e:
-              print("Gemini API error: " + str(e.code) + " - " + e.read().decode('utf-8'))
+              print("Gemini error: " + str(e.code) + " - " + e.read().decode('utf-8'))
               exit(1)
 
-          text = result['candidates'][0]['content']['parts'][0]['text'].strip()
-          print("Raw response: " + text[:200])
+          news_data = {"title": title, "content": content}
 
-          # Clean up any markdown fences
-          text = re.sub(r'^```json\s*', '', text)
-          text = re.sub(r'^```\s*', '', text)
-          text = re.sub(r'\s*```$', '', text)
-          text = text.strip()
-
-          # Extract JSON object if surrounded by other text
-          json_match = re.search(r'\{.*\}', text, re.DOTALL)
-          if json_match:
-              text = json_match.group(0)
-
-          news_data = json.loads(text)
-          print("Title: " + news_data.get('title', ''))
-
-          # Post comment
           comment_body = "## AI 新聞稿已生成\n\n"
-          comment_body += "**標題：** " + news_data['title'] + "\n\n---\n\n"
-          comment_body += news_data['content'] + "\n\n---\n\n"
+          comment_body += "**標題：** " + title + "\n\n---\n\n"
+          comment_body += content + "\n\n---\n\n"
           comment_body += "> 請回到發布介面點擊「載入預覽結果」查看並編輯。\n\n"
           comment_body += "<!-- GENERATED_NEWS\n"
           comment_body += json.dumps(news_data, ensure_ascii=False)
@@ -126,8 +101,7 @@ jobs:
               },
               method='POST'
           )
-
           with urllib.request.urlopen(comment_req) as resp:
-              print("Comment posted successfully")
+              print("Comment posted! Status: " + str(resp.status))
 
           PYEOF
