@@ -448,10 +448,12 @@
     color: var(--ink);
     width: 100%;
     min-height: 500px;
+    height: auto;
+    overflow: hidden;
     background: transparent;
     border: none;
     outline: none;
-    resize: vertical;
+    resize: none;
     font-family: 'Noto Sans TC', sans-serif;
     border: 1px dashed transparent;
     padding: 8px;
@@ -925,8 +927,12 @@ END_PUBLISH_DATA -->
 
     // 自動展開 textarea 高度
     const ta = document.getElementById('preview-content');
-    ta.style.height = 'auto';
-    ta.style.height = ta.scrollHeight + 'px';
+    const autoResize = () => {
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+    };
+    setTimeout(autoResize, 50);
+    ta.addEventListener('input', autoResize);
 
     document.getElementById('preview-section').style.display = 'block';
     document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
