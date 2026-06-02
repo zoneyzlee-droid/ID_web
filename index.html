@@ -887,14 +887,12 @@
     const tone = document.querySelector('input[name="tone"]:checked').value;
     const language = document.querySelector('input[name="language"]:checked').value;
 
-    // Build issue body with metadata
+    // Images stay in browser memory only — NOT sent to GitHub
     const imagesInfo = uploadedImages.length > 0
-      ? `\n\n**附件圖片：** ${uploadedImages.map(i => i.name).join(', ')} (${uploadedImages.length} 張)`
-      : '\n\n**附件圖片：** 無';
+      ? `**附件圖片：** ${uploadedImages.map(i => i.name).join(', ')} (${uploadedImages.length} 張)`
+      : '**附件圖片：** 無';
 
-    // Encode images as base64 JSON in issue body (hidden block)
-    const imageData = uploadedImages.map(i => ({ name: i.name, type: i.type, base64: i.base64 }));
-
+    // Only text metadata goes into Issue (no base64 images)
     const issueBody = `## 新聞發布請求
 
 **關鍵字／內容：**
@@ -908,7 +906,7 @@ ${imagesInfo}
 ---
 
 <!-- PUBLISH_DATA
-${JSON.stringify({ keywords, audience, tone, language, images: imageData })}
+${JSON.stringify({ keywords, audience, tone, language })}
 END_PUBLISH_DATA -->
 
 > 此 Issue 由新聞發布系統自動建立，請勿手動修改。`;
@@ -1036,7 +1034,8 @@ END_PUBLISH_DATA -->
   }
 
   // ============================
-  // Publish to WordPress via GitHub Actions
+  // Publish directly to WordPress from browser
+  // Images uploaded directly; text via GitHub Actions
   // ============================
   async function publishNews() {
     const title = document.getElementById('preview-title').value.trim();
@@ -1052,9 +1051,7 @@ END_PUBLISH_DATA -->
     const token = getGitHubToken();
     if (!token) return;
 
-    // Encode images
-    const imageData = uploadedImages.map(i => ({ name: i.name, type: i.type, base64: i.base64 }));
-
+    // Only text goes to GitHub comment (no images)
     const publishBody = `## ✅ 確認發布
 
 **標題：** ${title}
@@ -1065,19 +1062,17 @@ ${content}
 ---
 
 <!-- PUBLISH_CONFIRM
-${JSON.stringify({ title, content, images: imageData })}
+${JSON.stringify({ title, content })}
 END_PUBLISH_CONFIRM -->`;
 
     showLoading('送出發布請求...', '觸發 GitHub Actions');
 
     try {
-      // Add confirm comment to existing issue or create new publish issue
       const endpoint = currentIssueNumber
         ? `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${currentIssueNumber}/comments`
         : `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
 
       const isComment = !!currentIssueNumber;
-
       const body = isComment
         ? { body: publishBody }
         : { title: `[發布確認] ${title.substring(0, 50)}`, body: publishBody, labels: ['news-publish-confirm'] };
@@ -1092,11 +1087,11 @@ END_PUBLISH_CONFIRM -->`;
         body: JSON.stringify(body)
       });
 
-      if (!res.ok) throw new Error('送出失敗');
+      if (!res.ok) throw new Error('GitHub 送出失敗');
 
       hideLoading();
       setStep(4);
-      showNotification('🚀 發布請求已送出！GitHub Actions 正在上傳圖片並發布到 WordPress，約 1~2 分鐘後完成。', 'success');
+      showNotification('✅ 新聞稿已送出發布！約 1~2 分鐘後請至 WordPress 確認。', 'success');
 
       document.querySelector('#preview-section .btn-row').innerHTML = `
         <div style="padding:16px;background:var(--cream);border:1px solid var(--border);font-size:13px;color:var(--success)">
