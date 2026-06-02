@@ -6,7 +6,6 @@ on:
 
 jobs:
   publish-to-wordpress:
-    # Only run when comment contains PUBLISH_CONFIRM marker
     if: contains(github.event.comment.body, 'PUBLISH_CONFIRM')
     runs-on: ubuntu-latest
 
@@ -41,73 +40,26 @@ jobs:
           data = json.loads(match.group(1))
           title = data.get('title', '')
           content = data.get('content', '')
-          images = data.get('images', [])
 
-          print(f"Publishing: {title}")
-          print(f"Images count: {len(images)}")
+          print("Publishing: " + title)
 
           # Auth header
-          credentials = f"{wp_username}:{wp_app_password}"
+          credentials = wp_username + ":" + wp_app_password
           encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
-          auth_header = f"Basic {encoded}"
+          auth_header = "Basic " + encoded
 
-          # Upload images to WordPress media library
-          media_ids = []
-          featured_image_id = None
-
-          for i, img in enumerate(images):
-              print(f"Uploading image {i+1}: {img['name']}")
-              img_data = base64.b64decode(img['base64'])
-              img_type = img.get('type', 'image/jpeg')
-              img_name = img['name']
-
-              media_req = urllib.request.Request(
-                  f"{wp_url}/wp-json/wp/v2/media",
-                  data=img_data,
-                  headers={
-                      'Authorization': auth_header,
-                      'Content-Type': img_type,
-                      'Content-Disposition': f'attachment; filename="{img_name}"',
-                      'Accept': 'application/json'
-                  },
-                  method='POST'
-              )
-
-              try:
-                  with urllib.request.urlopen(media_req) as resp:
-                      media_result = json.loads(resp.read().decode('utf-8'))
-                      media_id = media_result['id']
-                      media_url = media_result['source_url']
-                      media_ids.append({'id': media_id, 'url': media_url, 'name': img_name})
-                      if i == 0:
-                          featured_image_id = media_id
-                      print(f"  Uploaded: {media_url}")
-              except urllib.error.HTTPError as e:
-                  print(f"  Image upload failed: {e.read().decode('utf-8')}")
-
-          # Build content with images embedded
-          img_html = ''
-          if media_ids:
-              img_html = '<div class="news-images" style="margin-bottom:24px;">'
-              for m in media_ids:
-                  img_html += f'<figure><img src="{m["url"]}" alt="{m["name"]}" style="max-width:100%;height:auto;margin-bottom:12px;" /></figure>'
-              img_html += '</div>'
-
-          full_content = img_html + content.replace('\n', '<br>\n')
+          # Format content
+          full_content = content.replace('\n', '<br>\n')
 
           # Publish to WordPress custom post type 'news'
           post_data = {
               'title': title,
               'content': full_content,
-              'status': 'publish',
-              'type': 'news'
+              'status': 'publish'
           }
 
-          if featured_image_id:
-              post_data['featured_media'] = featured_image_id
-
           post_req = urllib.request.Request(
-              f"{wp_url}/wp-json/wp/v2/news",
+              wp_url + "/wp-json/wp/v2/news",
               data=json.dumps(post_data).encode('utf-8'),
               headers={
                   'Authorization': auth_header,
@@ -117,59 +69,24 @@ jobs:
               method='POST'
           )
 
+          published_url = ''
+          published_id = ''
+
           try:
               with urllib.request.urlopen(post_req) as resp:
                   post_result = json.loads(resp.read().decode('utf-8'))
-                  post_url = post_result.get('link', '')
-                  post_id = post_result.get('id', '')
-                  print(f"Published! Post ID: {post_id}, URL: {post_url}")
-
-                  # Add success comment to GitHub issue
-                  success_comment = f"""## 🎉 已成功發布到 WordPress！
-
-**文章標題：** {title}
-**文章網址：** {post_url}
-**文章 ID：** {post_id}
-**上傳圖片：** {len(media_ids)} 張
-
-> 發布時間：$(date '+%Y-%m-%d %H:%M:%S')"""
-
-                  comment_req = urllib.request.Request(
-                      f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments",
-                      data=json.dumps({"body": success_comment}).encode('utf-8'),
-                      headers={
-                          'Authorization': f'token {gh_token}',
-                          'Content-Type': 'application/json',
-                          'Accept': 'application/vnd.github.v3+json'
-                      },
-                      method='POST'
-                  )
-                  with urllib.request.urlopen(comment_req):
-                      pass
-
-                  # Close the issue
-                  close_req = urllib.request.Request(
-                      f"https://api.github.com/repos/{repo}/issues/{issue_number}",
-                      data=json.dumps({"state": "closed"}).encode('utf-8'),
-                      headers={
-                          'Authorization': f'token {gh_token}',
-                          'Content-Type': 'application/json',
-                          'Accept': 'application/vnd.github.v3+json'
-                      },
-                      method='PATCH'
-                  )
-                  with urllib.request.urlopen(close_req):
-                      print("Issue closed")
+                  published_url = post_result.get('link', '')
+                  published_id = str(post_result.get('id', ''))
+                  print("Published! Post ID: " + published_id)
+                  print("URL: " + published_url)
 
           except urllib.error.HTTPError as e:
               error_body = e.read().decode('utf-8')
-              print(f"WordPress publish failed: {e.code} - {error_body}")
+              print("WordPress /news failed: " + str(e.code) + " - " + error_body)
+              print("Trying fallback to /posts...")
 
-              # Try fallback to standard posts if custom post type fails
-              print("Trying fallback to standard posts...")
-              post_data['type'] = 'post'
               post_req2 = urllib.request.Request(
-                  f"{wp_url}/wp-json/wp/v2/posts",
+                  wp_url + "/wp-json/wp/v2/posts",
                   data=json.dumps(post_data).encode('utf-8'),
                   headers={
                       'Authorization': auth_header,
@@ -181,9 +98,50 @@ jobs:
               try:
                   with urllib.request.urlopen(post_req2) as resp2:
                       post_result2 = json.loads(resp2.read().decode('utf-8'))
-                      print(f"Fallback published! URL: {post_result2.get('link','')}")
-              except Exception as e2:
-                  print(f"Fallback also failed: {e2}")
+                      published_url = post_result2.get('link', '')
+                      published_id = str(post_result2.get('id', ''))
+                      print("Fallback published! ID: " + published_id)
+              except urllib.error.HTTPError as e2:
+                  print("Fallback also failed: " + e2.read().decode('utf-8'))
                   exit(1)
+
+          # Post success comment
+          success_body = "## 已成功發布到 WordPress！\n\n"
+          success_body += "**文章標題：** " + title + "\n"
+          success_body += "**文章網址：** " + published_url + "\n"
+          success_body += "**文章 ID：** " + published_id + "\n"
+
+          comment_req = urllib.request.Request(
+              "https://api.github.com/repos/" + repo + "/issues/" + issue_number + "/comments",
+              data=json.dumps({"body": success_body}).encode('utf-8'),
+              headers={
+                  'Authorization': 'token ' + gh_token,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/vnd.github.v3+json'
+              },
+              method='POST'
+          )
+          try:
+              with urllib.request.urlopen(comment_req):
+                  print("Success comment posted")
+          except Exception as ex:
+              print("Could not post comment: " + str(ex))
+
+          # Close issue
+          close_req = urllib.request.Request(
+              "https://api.github.com/repos/" + repo + "/issues/" + issue_number,
+              data=json.dumps({"state": "closed"}).encode('utf-8'),
+              headers={
+                  'Authorization': 'token ' + gh_token,
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/vnd.github.v3+json'
+              },
+              method='PATCH'
+          )
+          try:
+              with urllib.request.urlopen(close_req):
+                  print("Issue closed")
+          except Exception as ex:
+              print("Could not close issue: " + str(ex))
 
           PYEOF
