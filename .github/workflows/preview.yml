@@ -6,13 +6,11 @@ on:
 
 jobs:
   generate-preview:
-    # Only run for news-publish labeled issues
     if: contains(github.event.issue.labels.*.name, 'news-publish')
     runs-on: ubuntu-latest
 
     steps:
       - name: 取得 Issue 內容並生成新聞稿
-        id: generate
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -20,15 +18,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          # Extract publish data from issue body
-          PUBLISH_DATA=$(echo "$ISSUE_BODY" | sed -n '/<!-- PUBLISH_DATA/,/END_PUBLISH_DATA -->/p' | grep -v 'PUBLISH_DATA' | grep -v 'END_PUBLISH_DATA')
-
-          if [ -z "$PUBLISH_DATA" ]; then
-            echo "No publish data found in issue"
-            exit 1
-          fi
-
-          # Parse fields using Python
           python3 << 'PYEOF'
           import os, json, re, urllib.request, urllib.error
 
@@ -49,7 +38,6 @@ jobs:
           audience = data.get('audience', '一般大眾')
           tone = data.get('tone', '正式學術')
           language = data.get('language', '繁體中文')
-          images = data.get('images', [])
 
           # Build prompt
           tone_map = {
@@ -58,46 +46,33 @@ jobs:
               '活潑年輕': '使用活潑、年輕的語氣，充滿活力，適合吸引學生族群',
               '新聞報導式': '使用客觀的新聞報導語氣，第三人稱，事實導向'
           }
-
-          lang_instruction = {
+          lang_map = {
               '繁體中文': '請以繁體中文撰寫',
               '英文': 'Please write in English',
               '中英雙語': '請同時提供繁體中文版本和英文版本，先中文後英文'
           }
 
           tone_instruction = tone_map.get(tone, tone_map['正式學術'])
-          lang_inst = lang_instruction.get(language, lang_instruction['繁體中文'])
+          lang_instruction = lang_map.get(language, lang_map['繁體中文'])
 
-          prompt = f"""你是逢甲大學室內設計學士學位學程的新聞稿撰寫助手。
-
-請根據以下資訊，撰寫一篇完整的新聞稿：
-
-【新聞內容關鍵字/描述】
-{keywords}
-
-【發布對象】：{audience}
-【語氣要求】：{tone_instruction}
-【語言要求】：{lang_inst}
-
-請生成：
-1. 一個吸引人的新聞標題（不超過30字）
-2. 完整的新聞內文（400~600字，包含引言、主體、結語）
-
-**重要：請只回傳以下 JSON 格式，不要有任何其他文字：**
-{{
-  "title": "新聞標題",
-  "content": "完整新聞內文"
-}}"""
+          prompt = "你是逢甲大學室內設計學士學位學程的新聞稿撰寫助手。\n\n"
+          prompt += "請根據以下資訊，撰寫一篇完整的新聞稿：\n\n"
+          prompt += "【新聞內容關鍵字/描述】\n" + keywords + "\n\n"
+          prompt += "【發布對象】：" + audience + "\n"
+          prompt += "【語氣要求】：" + tone_instruction + "\n"
+          prompt += "【語言要求】：" + lang_instruction + "\n\n"
+          prompt += "請生成：\n"
+          prompt += "1. 一個吸引人的新聞標題（不超過30字）\n"
+          prompt += "2. 完整的新聞內文（400~600字，包含引言、主體、結語）\n\n"
+          prompt += "重要：請只回傳以下 JSON 格式，不要有任何其他文字：\n"
+          prompt += '{"title": "新聞標題", "content": "完整新聞內文"}'
 
           # Call Gemini API
-          api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
+          api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + gemini_key
 
           payload = {
               "contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {
-                  "temperature": 0.7,
-                  "maxOutputTokens": 2000
-              }
+              "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2000}
           }
 
           req = urllib.request.Request(
@@ -111,15 +86,10 @@ jobs:
               with urllib.request.urlopen(req) as resp:
                   result = json.loads(resp.read().decode('utf-8'))
           except urllib.error.HTTPError as e:
-              error_body = e.read().decode('utf-8')
-              print(f"Gemini API error: {e.code} - {error_body}")
+              print("Gemini API error: " + str(e.code) + " - " + e.read().decode('utf-8'))
               exit(1)
 
-          # Extract text from response
-          text = result['candidates'][0]['content']['parts'][0]['text']
-
-          # Clean up JSON
-          text = text.strip()
+          text = result['candidates'][0]['content']['parts'][0]['text'].strip()
           if text.startswith('```json'):
               text = text[7:]
           if text.startswith('```'):
@@ -129,31 +99,23 @@ jobs:
           text = text.strip()
 
           news_data = json.loads(text)
+          print("Generated title: " + news_data.get('title', ''))
 
-          # Post comment to issue with generated news
-          comment_body = f"""## ✅ AI 新聞稿已生成
+          # Post comment
+          comment_body = "## AI 新聞稿已生成\n\n"
+          comment_body += "**標題：** " + news_data['title'] + "\n\n---\n\n"
+          comment_body += news_data['content'] + "\n\n---\n\n"
+          comment_body += "> 請回到發布介面點擊「載入預覽結果」查看並編輯。\n\n"
+          comment_body += "<!-- GENERATED_NEWS\n"
+          comment_body += json.dumps(news_data, ensure_ascii=False)
+          comment_body += "\nEND_GENERATED_NEWS -->"
 
-**標題：** {news_data['title']}
-
----
-
-{news_data['content']}
-
----
-
-> 請回到發布介面點擊「載入預覽結果」查看並編輯。
-
-<!-- GENERATED_NEWS
-{json.dumps(news_data, ensure_ascii=False)}
-END_GENERATED_NEWS -->"""
-
-          # Post comment via GitHub API
-          comment_url = f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments"
+          comment_url = "https://api.github.com/repos/" + repo + "/issues/" + issue_number + "/comments"
           comment_req = urllib.request.Request(
               comment_url,
               data=json.dumps({"body": comment_body}).encode('utf-8'),
               headers={
-                  'Authorization': f'token {gh_token}',
+                  'Authorization': 'token ' + gh_token,
                   'Content-Type': 'application/json',
                   'Accept': 'application/vnd.github.v3+json'
               },
@@ -161,7 +123,6 @@ END_GENERATED_NEWS -->"""
           )
 
           with urllib.request.urlopen(comment_req) as resp:
-              print(f"Comment posted: {resp.status}")
-              print("SUCCESS: News generated and posted to issue")
+              print("Comment posted successfully")
 
           PYEOF
