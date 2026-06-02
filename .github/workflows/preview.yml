@@ -39,7 +39,6 @@ jobs:
           tone = data.get('tone', '正式學術')
           language = data.get('language', '繁體中文')
 
-          # Build prompt
           tone_map = {
               '正式學術': '使用正式、學術的語氣，措辭嚴謹，適合對外官方公告',
               '親切溫暖': '使用親切、溫暖的語氣，貼近讀者，讓人感到友善',
@@ -55,25 +54,26 @@ jobs:
           tone_instruction = tone_map.get(tone, tone_map['正式學術'])
           lang_instruction = lang_map.get(language, lang_map['繁體中文'])
 
-          prompt = "你是逢甲大學室內設計學士學位學程的新聞稿撰寫助手。\n\n"
-          prompt += "請根據以下資訊，撰寫一篇完整的新聞稿：\n\n"
-          prompt += "【新聞內容關鍵字/描述】\n" + keywords + "\n\n"
-          prompt += "【發布對象】：" + audience + "\n"
-          prompt += "【語氣要求】：" + tone_instruction + "\n"
-          prompt += "【語言要求】：" + lang_instruction + "\n\n"
-          prompt += "請生成：\n"
-          prompt += "1. 一個吸引人的新聞標題（不超過30字）\n"
-          prompt += "2. 完整的新聞內文（400~600字，包含引言、主體、結語）\n\n"
-          prompt += "重要：請只回傳以下 JSON 格式，不要有任何其他文字：\n"
-          prompt += '{"title": "新聞標題", "content": "完整新聞內文"}'
-
-          # Call Gemini API
-          api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + gemini_key
+          prompt = "你是逢甲大學室內設計學士學位學程的新聞稿撰寫助手。\n"
+          prompt += "請根據以下資訊撰寫新聞稿。\n\n"
+          prompt += "關鍵字：" + keywords + "\n"
+          prompt += "對象：" + audience + "\n"
+          prompt += "語氣：" + tone_instruction + "\n"
+          prompt += "語言：" + lang_instruction + "\n\n"
+          prompt += "請回傳 JSON 格式如下，title 為標題不超過30字，content 為內文400到600字。\n"
+          prompt += "只能回傳 JSON，不能有其他文字、不能有 markdown 符號：\n"
+          prompt += "{\"title\": \"標題\", \"content\": \"內文\"}"
 
           payload = {
               "contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.7, "maxOutputTokens": 2000}
+              "generationConfig": {
+                  "temperature": 0.7,
+                  "maxOutputTokens": 2000,
+                  "responseMimeType": "application/json"
+              }
           }
+
+          api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + gemini_key
 
           req = urllib.request.Request(
               api_url,
@@ -90,16 +90,21 @@ jobs:
               exit(1)
 
           text = result['candidates'][0]['content']['parts'][0]['text'].strip()
-          if text.startswith('```json'):
-              text = text[7:]
-          if text.startswith('```'):
-              text = text[3:]
-          if text.endswith('```'):
-              text = text[:-3]
+          print("Raw response: " + text[:200])
+
+          # Clean up any markdown fences
+          text = re.sub(r'^```json\s*', '', text)
+          text = re.sub(r'^```\s*', '', text)
+          text = re.sub(r'\s*```$', '', text)
           text = text.strip()
 
+          # Extract JSON object if surrounded by other text
+          json_match = re.search(r'\{.*\}', text, re.DOTALL)
+          if json_match:
+              text = json_match.group(0)
+
           news_data = json.loads(text)
-          print("Generated title: " + news_data.get('title', ''))
+          print("Title: " + news_data.get('title', ''))
 
           # Post comment
           comment_body = "## AI 新聞稿已生成\n\n"
