@@ -95,7 +95,7 @@ jobs:
 
           # ── 發布到 Facebook ──
           fb_published_url = ''
-          photos = data.get('photos', [])  # list of base64 strings
+          photo_urls = data.get('photo_urls', [])  # list of GitHub Release Asset URLs
 
           if fb_token and fb_page_id:
               # 組合 FB 貼文內容
@@ -104,37 +104,44 @@ jobs:
               else:
                   fb_text = fb_text + (f"\n\n🔗 閱讀全文：{published_url}" if published_url else "")
 
-              # 先逐張上傳照片（unpublished），收集 photo_id
+              # 逐張下載照片後上傳到 FB（unpublished）
               media_ids = []
-              for idx, b64 in enumerate(photos[:5]):  # 最多5張
-                  photo_bytes = base64.b64decode(b64)
-                  # multipart/form-data 手動組裝
-                  boundary = f'----FormBoundary{idx}'
-                  body_parts = []
-                  body_parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="published"\r\n\r\nfalse'.encode())
-                  body_parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="access_token"\r\n\r\n{fb_token}'.encode())
-                  body_parts.append(
-                      f'--{boundary}\r\nContent-Disposition: form-data; name="source"; filename="photo{idx}.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'.encode()
-                      + photo_bytes
-                  )
-                  body_parts.append(f'--{boundary}--'.encode())
-                  multipart_body = b'\r\n'.join(body_parts)
-
-                  photo_req = urllib.request.Request(
-                      f"https://graph.facebook.com/v25.0/{fb_page_id}/photos",
-                      data=multipart_body,
-                      headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
-                      method='POST'
-                  )
+              for idx, url in enumerate(photo_urls[:5]):
                   try:
+                      # 下載照片
+                      dl_req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                      with urllib.request.urlopen(dl_req) as dl_resp:
+                          photo_bytes = dl_resp.read()
+                      print(f"Photo {idx+1} downloaded: {len(photo_bytes)} bytes")
+
+                      # 上傳到 FB（multipart/form-data）
+                      boundary = f'----FormBoundary{idx}'
+                      body_parts = []
+                      body_parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="published"\r\n\r\nfalse'.encode())
+                      body_parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="access_token"\r\n\r\n{fb_token}'.encode())
+                      body_parts.append(
+                          f'--{boundary}\r\nContent-Disposition: form-data; name="source"; filename="photo{idx}.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'.encode()
+                          + photo_bytes
+                      )
+                      body_parts.append(f'--{boundary}--'.encode())
+                      multipart_body = b'\r\n'.join(body_parts)
+
+                      photo_req = urllib.request.Request(
+                          f"https://graph.facebook.com/v25.0/{fb_page_id}/photos",
+                          data=multipart_body,
+                          headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
+                          method='POST'
+                      )
                       with urllib.request.urlopen(photo_req) as resp:
                           photo_result = json.loads(resp.read().decode('utf-8'))
                           photo_id = photo_result.get('id', '')
                           if photo_id:
                               media_ids.append(photo_id)
-                              print(f"Photo {idx+1} uploaded: {photo_id}")
+                              print(f"Photo {idx+1} uploaded to FB: {photo_id}")
                   except urllib.error.HTTPError as e:
-                      print(f"Photo {idx+1} upload failed: {e.code} - {e.read().decode('utf-8')}")
+                      print(f"Photo {idx+1} failed: {e.code} - {e.read().decode('utf-8')}")
+                  except Exception as e:
+                      print(f"Photo {idx+1} error: {str(e)}")
 
               # 發文（含圖 or 純文字）
               if media_ids:
