@@ -447,9 +447,9 @@
     line-height: 1.9;
     color: var(--ink);
     width: 100%;
-    min-height: 500px;
+    min-height: 200px;
     height: auto;
-    overflow: hidden;
+    overflow-y: hidden;
     background: transparent;
     border: none;
     outline: none;
@@ -458,6 +458,7 @@
     border: 1px dashed transparent;
     padding: 8px;
     transition: border-color 0.2s;
+    box-sizing: border-box;
   }
 
   #preview-content:focus {
@@ -1012,10 +1013,11 @@ END_PUBLISH_DATA -->
     // 自動展開 textarea 高度
     const ta = document.getElementById('preview-content');
     const autoResize = () => {
-      ta.style.height = 'auto';
-      ta.style.height = ta.scrollHeight + 'px';
+      ta.style.height = '0px';
+      ta.style.height = (ta.scrollHeight + 4) + 'px';
     };
-    setTimeout(autoResize, 50);
+    // 用雙重 rAF 確保瀏覽器完成 layout 再計算高度
+    requestAnimationFrame(() => requestAnimationFrame(autoResize));
     ta.addEventListener('input', autoResize);
 
     document.getElementById('preview-section').style.display = 'block';
