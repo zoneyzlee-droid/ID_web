@@ -23,7 +23,7 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           python3 << 'PYEOF'
-          import os, json, re, urllib.request, urllib.error, base64
+          import os, json, re, urllib.request, urllib.error, urllib.parse, base64
 
           comment_body = os.environ.get('COMMENT_BODY', '')
           wp_url = os.environ.get('WP_URL', '').rstrip('/')
@@ -95,24 +95,66 @@ jobs:
 
           # ── 發布到 Facebook ──
           fb_published_url = ''
+          photos = data.get('photos', [])  # list of base64 strings
+
           if fb_token and fb_page_id:
               # 組合 FB 貼文內容
               if not fb_text:
                   fb_text = f"📰 {title}\n\n{content[:200]}...\n\n🔗 閱讀全文：{published_url}"
               else:
-                  fb_text = fb_text + f"\n\n🔗 閱讀全文：{published_url}"
+                  fb_text = fb_text + (f"\n\n🔗 閱讀全文：{published_url}" if published_url else "")
 
-              fb_post_data = {
-                  'message': fb_text,
-                  'link': published_url
-              }
+              # 先逐張上傳照片（unpublished），收集 photo_id
+              media_ids = []
+              for idx, b64 in enumerate(photos[:5]):  # 最多5張
+                  photo_bytes = base64.b64decode(b64)
+                  # multipart/form-data 手動組裝
+                  boundary = f'----FormBoundary{idx}'
+                  body_parts = []
+                  body_parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="published"\r\n\r\nfalse'.encode())
+                  body_parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="access_token"\r\n\r\n{fb_token}'.encode())
+                  body_parts.append(
+                      f'--{boundary}\r\nContent-Disposition: form-data; name="source"; filename="photo{idx}.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'.encode()
+                      + photo_bytes
+                  )
+                  body_parts.append(f'--{boundary}--'.encode())
+                  multipart_body = b'\r\n'.join(body_parts)
+
+                  photo_req = urllib.request.Request(
+                      f"https://graph.facebook.com/v25.0/{fb_page_id}/photos",
+                      data=multipart_body,
+                      headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
+                      method='POST'
+                  )
+                  try:
+                      with urllib.request.urlopen(photo_req) as resp:
+                          photo_result = json.loads(resp.read().decode('utf-8'))
+                          photo_id = photo_result.get('id', '')
+                          if photo_id:
+                              media_ids.append(photo_id)
+                              print(f"Photo {idx+1} uploaded: {photo_id}")
+                  except urllib.error.HTTPError as e:
+                      print(f"Photo {idx+1} upload failed: {e.code} - {e.read().decode('utf-8')}")
+
+              # 發文（含圖 or 純文字）
+              if media_ids:
+                  fb_post_data = {
+                      'message': fb_text,
+                      'attached_media': json.dumps([{'media_fbid': mid} for mid in media_ids])
+                  }
+                  if published_url:
+                      fb_post_data['link'] = published_url
+              else:
+                  fb_post_data = {'message': fb_text}
+                  if published_url:
+                      fb_post_data['link'] = published_url
 
               fb_req = urllib.request.Request(
                   f"https://graph.facebook.com/v25.0/{fb_page_id}/feed",
-                  data=json.dumps(fb_post_data).encode('utf-8'),
+                  data=urllib.parse.urlencode(fb_post_data).encode('utf-8'),
                   headers={
                       'Authorization': f'Bearer {fb_token}',
-                      'Content-Type': 'application/json'
+                      'Content-Type': 'application/x-www-form-urlencoded'
                   },
                   method='POST'
               )
