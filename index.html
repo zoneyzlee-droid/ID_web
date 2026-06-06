@@ -749,9 +749,24 @@
       <textarea id="preview-fb" placeholder="Facebook 貼文內容" style="width:100%;min-height:120px;font-size:14px;line-height:1.7;padding:12px;border:1px dashed var(--border);border-radius:8px;font-family:'Noto Sans TC',sans-serif;resize:vertical;background:var(--cream);box-sizing:border-box;"></textarea>
     </div>
 
-    <div class="btn-row">
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">
+        <div class="icon">📷</div>
+        上傳照片（發布到 Facebook）
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">照片僅會發布到 Facebook，不會上傳至 WordPress。最多 5 張，每張自動壓縮。</p>
+      <div class="upload-area" id="upload-area">
+        <input type="file" id="photo-input" accept="image/*" multiple onchange="handlePhotoUpload(event)">
+        <div class="upload-icon">📁</div>
+        <p><strong>點擊選取</strong>或拖曳照片到此處</p>
+        <p style="margin-top:6px;font-size:12px">支援 JPG、PNG、WEBP，最多 5 張</p>
+      </div>
+      <div class="image-previews" id="image-previews"></div>
+    </div>
+
+    <div id="preview-section-btns" class="btn-row">
       <button class="btn btn-success" onclick="publishNews()">
-        🚀 確認發布到 WordPress
+        🚀 確認發布到 Facebook
       </button>
       <button class="btn btn-secondary" onclick="regenerate()">
         🔄 重新生成
@@ -781,6 +796,7 @@
   // State
   // ============================
   let currentIssueNumber = null;
+  let uploadedPhotos = []; // [{base64, name}]
 
   // ============================
   // GitHub Token (session only)
@@ -792,6 +808,64 @@
       if (token) sessionStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
     }
     return token;
+  }
+
+  // ============================
+  // Photo upload + compress
+  // ============================
+  async function compressImage(file, maxWidth = 1200, quality = 0.75) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const b64 = canvas.toDataURL('image/jpeg', quality).split(',')[1];
+          resolve(b64);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handlePhotoUpload(event) {
+    const files = Array.from(event.target.files);
+    if (uploadedPhotos.length + files.length > 5) {
+      showNotification('最多只能上傳 5 張照片。', 'error');
+      return;
+    }
+    showLoading('壓縮照片中...', '請稍候');
+    for (const file of files) {
+      const b64 = await compressImage(file);
+      uploadedPhotos.push({ base64: b64, name: file.name });
+    }
+    hideLoading();
+    renderPhotoPreviews();
+    event.target.value = '';
+  }
+
+  function removePhoto(index) {
+    uploadedPhotos.splice(index, 1);
+    renderPhotoPreviews();
+  }
+
+  function renderPhotoPreviews() {
+    const container = document.getElementById('image-previews');
+    container.innerHTML = '';
+    uploadedPhotos.forEach((p, i) => {
+      const item = document.createElement('div');
+      item.className = 'image-preview-item';
+      item.innerHTML = `
+        <img src="data:image/jpeg;base64,${p.base64}" alt="${p.name}">
+        <button onclick="removePhoto(${i})" title="刪除">✕</button>
+      `;
+      container.appendChild(item);
+    });
   }
 
   // ============================
@@ -964,17 +1038,33 @@ END_PUBLISH_DATA -->
       return;
     }
 
-    if (!confirm(`確認要發布這篇新聞到 WordPress 嗎？\n\n標題：${title}`)) return;
+    const photoCount = uploadedPhotos.length;
+    const confirmMsg = photoCount > 0
+      ? `確認要發布這篇新聞到 Facebook 嗎？\n\n標題：${title}\n附帶照片：${photoCount} 張`
+      : `確認要發布這篇新聞到 Facebook 嗎？（沒有附帶照片）\n\n標題：${title}`;
+    if (!confirm(confirmMsg)) return;
 
     const token = getGitHubToken();
     if (!token) return;
 
-    // 只傳文字，圖片請在 WordPress 後台手動上傳
-    const confirmData = { title, content, fb_text };
+    // 帶入照片 base64（已壓縮）
+    const confirmData = {
+      title,
+      content,
+      fb_text,
+      photos: uploadedPhotos.map(p => p.base64)  // array of base64 strings
+    };
 
     const commentBody = `<!-- PUBLISH_CONFIRM\n${JSON.stringify(confirmData)}\nEND_PUBLISH_CONFIRM -->`;
 
-    showLoading('送出發布請求中...', '圖片打包中，請稍候');
+    // 估算大小給使用者看
+    const estimatedKB = Math.round(new Blob([commentBody]).size / 1024);
+    if (estimatedKB > 60) {
+      showNotification(`⚠️ 照片總大小約 ${estimatedKB}KB，可能超過 GitHub 限制（65KB）。建議減少照片數量或選較小的圖片。`, 'error');
+      return;
+    }
+
+    showLoading('送出發布請求中...', `打包 ${photoCount} 張照片（約 ${estimatedKB}KB）`);
 
     try {
       const issueNumber = currentIssueNumber;
@@ -997,13 +1087,13 @@ END_PUBLISH_DATA -->
 
       hideLoading();
       setStep(4);
-      showNotification(`✅ 發布請求已送出！GitHub Actions 正在發布到 WordPress，約 1~2 分鐘後完成。`, 'success');
+      showNotification(`✅ 發布請求已送出！GitHub Actions 正在發布到 Facebook，約 1~2 分鐘後完成。`, 'success');
 
-      document.querySelector('#preview-section .btn-row').innerHTML = `
+      document.getElementById('preview-section-btns').innerHTML = `
         <div style="padding:16px;background:var(--cream);border:1px solid var(--border);font-size:13px;color:var(--success);line-height:2">
-          ✅ 發布請求已送出！請稍候約 1~2 分鐘，WordPress 即會更新。<br>
+          ✅ 發布請求已送出！請稍候約 1~2 分鐘，Facebook 即會更新。<br>
           <a href="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/issues/${issueNumber}" target="_blank" style="color:var(--accent)">→ 查看發布進度（GitHub Issue）</a><br>
-          <a href="https://id.fcu.edu.tw/wp-admin/edit.php?post_type=news" target="_blank" style="color:var(--accent)">→ 前往 WordPress 後台新增照片</a>
+          <a href="https://www.facebook.com/1126727350526465" target="_blank" style="color:var(--accent)">→ 前往粉絲專頁確認</a>
         </div>
         <button class="btn btn-secondary" onclick="resetForm()">← 發布新一則新聞</button>
       `;
@@ -1029,6 +1119,8 @@ END_PUBLISH_DATA -->
   // ============================
   function resetForm() {
     currentIssueNumber = null;
+    uploadedPhotos = [];
+    document.getElementById('image-previews').innerHTML = '';
     document.getElementById('keywords').value = '';
     document.getElementById('issue-link-box').style.display = 'none';
     document.getElementById('preview-section').style.display = 'none';
