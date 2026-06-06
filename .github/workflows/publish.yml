@@ -1,4 +1,4 @@
-name: 發布新聞到 WordPress
+name: 發布新聞到 WordPress 和 Facebook
 
 on:
   issue_comment:
@@ -10,11 +10,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 發布新聞到 WordPress
+      - name: 發布新聞到 WordPress 和 Facebook
         env:
           WP_URL: ${{ secrets.WP_URL }}
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          FB_PAGE_ID: "1126727350526465"
           COMMENT_BODY: ${{ github.event.comment.body }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -27,6 +29,8 @@ jobs:
           wp_url = os.environ.get('WP_URL', '').rstrip('/')
           wp_username = os.environ.get('WP_USERNAME', '')
           wp_app_password = os.environ.get('WP_APP_PASSWORD', '')
+          fb_token = os.environ.get('FB_PAGE_TOKEN', '')
+          fb_page_id = os.environ.get('FB_PAGE_ID', '')
           gh_token = os.environ.get('GH_TOKEN', '')
           repo = os.environ.get('REPO', '')
           issue_number = os.environ.get('ISSUE_NUMBER', '')
@@ -39,15 +43,16 @@ jobs:
           data = json.loads(match.group(1))
           title = data.get('title', '')
           content = data.get('content', '')
+          fb_text = data.get('fb_text', '')  # FB 貼文文字
 
           print(f"Publishing: {title}")
 
+          # ── 發布到 WordPress ──
           credentials = wp_username + ":" + wp_app_password
           encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
           auth_header = "Basic " + encoded
 
           full_content = content.replace('\n', '<br>\n')
-
           post_data = {
               'title': title,
               'content': full_content,
@@ -78,21 +83,54 @@ jobs:
 
           try:
               try_post("/wp-json/wp/v2/news")
-              print(f"Published! ID: {published_id}")
+              print(f"WP Published! ID: {published_id}")
           except urllib.error.HTTPError as e:
               print(f"/news failed: {e.code}, trying /posts...")
               try:
                   try_post("/wp-json/wp/v2/posts")
-                  print(f"Fallback published! ID: {published_id}")
+                  print(f"WP Fallback published! ID: {published_id}")
               except urllib.error.HTTPError as e2:
-                  print("Both endpoints failed: " + e2.read().decode('utf-8'))
+                  print("Both WP endpoints failed: " + e2.read().decode('utf-8'))
                   exit(1)
 
-          # 回報成功
-          success_body = "## ✅ 已成功發布到 WordPress！\n\n"
+          # ── 發布到 Facebook ──
+          fb_published_url = ''
+          if fb_token and fb_page_id:
+              # 組合 FB 貼文內容
+              if not fb_text:
+                  fb_text = f"📰 {title}\n\n{content[:200]}...\n\n🔗 閱讀全文：{published_url}"
+              else:
+                  fb_text = fb_text + f"\n\n🔗 閱讀全文：{published_url}"
+
+              fb_post_data = {
+                  'message': fb_text,
+                  'link': published_url
+              }
+
+              fb_req = urllib.request.Request(
+                  f"https://graph.facebook.com/v25.0/{fb_page_id}/feed",
+                  data=json.dumps(fb_post_data).encode('utf-8'),
+                  headers={
+                      'Authorization': f'Bearer {fb_token}',
+                      'Content-Type': 'application/json'
+                  },
+                  method='POST'
+              )
+              try:
+                  with urllib.request.urlopen(fb_req) as resp:
+                      fb_result = json.loads(resp.read().decode('utf-8'))
+                      fb_post_id = fb_result.get('id', '')
+                      fb_published_url = f"https://www.facebook.com/{fb_post_id.replace('_', '/posts/')}"
+                      print(f"FB Published! Post ID: {fb_post_id}")
+              except urllib.error.HTTPError as e:
+                  print(f"FB publish failed: {e.code} - {e.read().decode('utf-8')}")
+
+          # ── 回報成功 ──
+          success_body = "## ✅ 發布完成！\n\n"
           success_body += f"**文章標題：** {title}\n"
-          success_body += f"**文章網址：** {published_url}\n"
-          success_body += f"**文章 ID：** {published_id}\n"
+          success_body += f"**WordPress：** {published_url}\n"
+          if fb_published_url:
+              success_body += f"**Facebook：** {fb_published_url}\n"
           success_body += "\n> 📷 請到 WordPress 後台手動上傳照片到這篇文章。"
 
           comment_req = urllib.request.Request(
@@ -111,7 +149,7 @@ jobs:
           except Exception as ex:
               print("Could not post comment: " + str(ex))
 
-          # 關閉 Issue
+          # ── 關閉 Issue ──
           close_req = urllib.request.Request(
               f"https://api.github.com/repos/{repo}/issues/{issue_number}",
               data=json.dumps({"state": "closed"}).encode('utf-8'),

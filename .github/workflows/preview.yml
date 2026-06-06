@@ -50,11 +50,6 @@ jobs:
               '中英雙語': '繁體中文與英文雙語'
           }
 
-          # Use two separate prompts to avoid JSON issues
-          title_prompt = "你是逢甲大學室內設計學程新聞助手。請根據以下關鍵字，產生一個新聞標題，不超過30個字，只輸出標題文字，不要有任何其他內容：\n關鍵字：" + keywords
-
-          content_prompt = "你是逢甲大學室內設計學程新聞助手。請根據以下資訊撰寫新聞內文，400到600字，" + tone_map.get(tone, '正式學術語氣') + "，以" + lang_map.get(language, '繁體中文') + "撰寫，對象為" + audience + "。只輸出內文，不要標題，不要任何格式符號：\n關鍵字：" + keywords
-
           def call_gemini(prompt):
               payload = {
                   "contents": [{"parts": [{"text": prompt}]}],
@@ -72,19 +67,31 @@ jobs:
               return result['candidates'][0]['content']['parts'][0]['text'].strip()
 
           try:
+              # 新聞標題
+              title_prompt = "你是逢甲大學室內設計學程新聞助手。請根據以下關鍵字，產生一個新聞標題，不超過30個字，只輸出標題文字，不要有任何其他內容：\n關鍵字：" + keywords
               title = call_gemini(title_prompt)
               print("Title: " + title)
+
+              # 新聞內文
+              content_prompt = "你是逢甲大學室內設計學程新聞助手。請根據以下資訊撰寫新聞內文，400到600字，" + tone_map.get(tone, '正式學術語氣') + "，以" + lang_map.get(language, '繁體中文') + "撰寫，對象為" + audience + "。只輸出內文，不要標題，不要任何格式符號：\n關鍵字：" + keywords
               content = call_gemini(content_prompt)
               print("Content length: " + str(len(content)))
+
+              # FB 貼文
+              fb_prompt = "你是逢甲大學室內設計學程的社群小編。請根據以下關鍵字，撰寫一則適合 Facebook 粉絲專頁的貼文，150字以內，語氣親切活潑，可以加入適當的 emoji 和 2-3 個 hashtag。只輸出貼文內容，不要其他說明：\n關鍵字：" + keywords
+              fb_text = call_gemini(fb_prompt)
+              print("FB text length: " + str(len(fb_text)))
+
           except urllib.error.HTTPError as e:
               print("Gemini error: " + str(e.code) + " - " + e.read().decode('utf-8'))
               exit(1)
 
-          news_data = {"title": title, "content": content}
+          news_data = {"title": title, "content": content, "fb_text": fb_text}
 
           comment_body = "## AI 新聞稿已生成\n\n"
           comment_body += "**標題：** " + title + "\n\n---\n\n"
           comment_body += content + "\n\n---\n\n"
+          comment_body += "**FB 貼文草稿：**\n\n" + fb_text + "\n\n---\n\n"
           comment_body += "> 請回到發布介面點擊「載入預覽結果」查看並編輯。\n\n"
           comment_body += "<!-- GENERATED_NEWS\n"
           comment_body += json.dumps(news_data, ensure_ascii=False)
