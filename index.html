@@ -740,6 +740,15 @@
       </div>
     </div>
 
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">
+        <div class="icon">📘</div>
+        Facebook 貼文預覽
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px">AI 自動生成社群版本，可直接編輯後發布</p>
+      <textarea id="preview-fb" placeholder="Facebook 貼文內容" style="width:100%;min-height:120px;font-size:14px;line-height:1.7;padding:12px;border:1px dashed var(--border);border-radius:8px;font-family:'Noto Sans TC',sans-serif;resize:vertical;background:var(--cream);box-sizing:border-box;"></textarea>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-success" onclick="publishNews()">
         🚀 確認發布到 WordPress
@@ -924,6 +933,7 @@ END_PUBLISH_DATA -->
   function showPreview(newsData) {
     document.getElementById('preview-title').value = newsData.title || '';
     document.getElementById('preview-content').value = newsData.content || '';
+    document.getElementById('preview-fb').value = newsData.fb_text || '';
 
     // 自動展開 textarea 高度
     const ta = document.getElementById('preview-content');
@@ -947,6 +957,7 @@ END_PUBLISH_DATA -->
   async function publishNews() {
     const title = document.getElementById('preview-title').value.trim();
     const content = document.getElementById('preview-content').value.trim();
+    const fb_text = document.getElementById('preview-fb').value.trim();
 
     if (!title || !content) {
       showNotification('請確認標題和內文都已填寫！', 'error');
@@ -959,7 +970,7 @@ END_PUBLISH_DATA -->
     if (!token) return;
 
     // 只傳文字，圖片請在 WordPress 後台手動上傳
-    const confirmData = { title, content };
+    const confirmData = { title, content, fb_text };
 
     const commentBody = `<!-- PUBLISH_CONFIRM\n${JSON.stringify(confirmData)}\nEND_PUBLISH_CONFIRM -->`;
 
