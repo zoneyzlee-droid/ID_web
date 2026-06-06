@@ -1025,71 +1025,39 @@ END_PUBLISH_DATA -->
   }
 
   // ============================
-  // 上傳照片到 GitHub Release Asset，回傳 URL 陣列
+  // 上傳照片到 GitHub repo Contents API（支援 CORS）
+  // 存到 news-photos/ 資料夾，回傳 raw URL 陣列
   // ============================
-  async function uploadPhotosToRelease(token, issueNumber) {
+  async function uploadPhotosToRepo(token, issueNumber) {
     if (uploadedPhotos.length === 0) return [];
 
-    // 1. 建立（或取得）一個專用 release tag
-    const tag = `news-photos-${issueNumber}`;
-    let uploadUrl = '';
-
-    // 先嘗試建立 release
-    const createRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `token ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      body: JSON.stringify({
-        tag_name: tag,
-        name: `新聞照片 Issue #${issueNumber}`,
-        body: '自動上傳的新聞照片',
-        draft: false,
-        prerelease: true
-      })
-    });
-
-    if (createRes.ok) {
-      const rel = await createRes.json();
-      uploadUrl = rel.upload_url.replace('{?name,label}', '');
-    } else {
-      // release 已存在，查出 upload_url
-      const listRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${tag}`, {
-        headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
-      });
-      if (!listRes.ok) throw new Error('無法建立或取得 Release');
-      const rel = await listRes.json();
-      uploadUrl = rel.upload_url.replace('{?name,label}', '');
-    }
-
-    // 2. 逐張上傳
     const urls = [];
     for (let i = 0; i < uploadedPhotos.length; i++) {
       const p = uploadedPhotos[i];
-      showLoading(`上傳照片中...`, `第 ${i + 1} / ${uploadedPhotos.length} 張`);
+      showLoading('上傳照片中...', `第 ${i + 1} / ${uploadedPhotos.length} 張`);
 
-      // base64 → binary
-      const binary = atob(p.base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+      const filename = `news-photos/issue-${issueNumber}-${i + 1}-${Date.now()}.jpg`;
+      const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filename}`;
 
-      const filename = `photo-${issueNumber}-${i + 1}-${Date.now()}.jpg`;
-      const upRes = await fetch(`${uploadUrl}?name=${filename}`, {
-        method: 'POST',
+      const res = await fetch(apiUrl, {
+        method: 'PUT',
         headers: {
           'Authorization': `token ${token}`,
-          'Content-Type': 'image/jpeg'
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
         },
-        body: bytes
+        body: JSON.stringify({
+          message: `上傳新聞照片 Issue #${issueNumber}`,
+          content: p.base64
+        })
       });
-      if (!upRes.ok) {
-        const err = await upRes.json();
+
+      if (!res.ok) {
+        const err = await res.json();
         throw new Error(`照片 ${i + 1} 上傳失敗：${err.message}`);
       }
-      const asset = await upRes.json();
-      urls.push(asset.browser_download_url);
+      const result = await res.json();
+      urls.push(result.content.download_url);
     }
     return urls;
   }
@@ -1122,7 +1090,7 @@ END_PUBLISH_DATA -->
     try {
       // 1. 先把照片上傳到 GitHub Release Asset，取回公開 URL
       showLoading('上傳照片中...', '請稍候');
-      const photoUrls = await uploadPhotosToRelease(token, issueNumber);
+      const photoUrls = await uploadPhotosToRepo(token, issueNumber);
 
       // 2. 送出 PUBLISH_CONFIRM comment（只有 URL，不含 base64）
       showLoading('送出發布請求中...', '');
