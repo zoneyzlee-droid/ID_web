@@ -1010,19 +1010,20 @@ END_PUBLISH_DATA -->
     document.getElementById('preview-content').value = newsData.content || '';
     document.getElementById('preview-fb').value = newsData.fb_text || '';
 
-    // 自動展開 textarea 高度
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setStep(3);
+
+    // 自動展開 textarea 高度（必須在 display:block 之後才能正確量出 scrollHeight）
     const ta = document.getElementById('preview-content');
     const autoResize = () => {
       ta.style.height = '0px';
       ta.style.height = (ta.scrollHeight + 4) + 'px';
     };
-    // 用雙重 rAF 確保瀏覽器完成 layout 再計算高度
     requestAnimationFrame(() => requestAnimationFrame(autoResize));
+    setTimeout(autoResize, 300); // 後備：避免 smooth scroll 動畫影響 layout 時機
     ta.addEventListener('input', autoResize);
 
-    document.getElementById('preview-section').style.display = 'block';
-    document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setStep(3);
     showNotification('✅ 預覽已載入！你可以直接點擊標題或內文進行編輯。', 'success');
   }
 
