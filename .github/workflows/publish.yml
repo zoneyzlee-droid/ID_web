@@ -144,14 +144,14 @@ jobs:
                       print(f"Photo {idx+1} error: {str(e)}")
 
               # 發文（含圖 or 純文字）
+              # 注意：有照片時不加 link，避免 FB 顯示 WordPress 的預覽卡蓋掉照片
               if media_ids:
                   fb_post_data = {
                       'message': fb_text,
                       'attached_media': json.dumps([{'media_fbid': mid} for mid in media_ids])
                   }
-                  if published_url:
-                      fb_post_data['link'] = published_url
               else:
+                  # 沒有照片才加 link 預覽卡
                   fb_post_data = {'message': fb_text}
                   if published_url:
                       fb_post_data['link'] = published_url
